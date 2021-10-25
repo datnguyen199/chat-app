@@ -9,12 +9,15 @@ var messages = document.getElementById('display-messages');
 var messageTemplate = document.getElementById('message-template').innerHTML;
 var locationTemplate = document.getElementById('location-template').innerHTML;
 
+let { username, room } = Qs.parse(location.search, { ignoreQueryPrefix: true })
+
 form.addEventListener('submit', function(e){
   e.preventDefault();
   if(input.value) {
     socket.emit('chatMessage', input.value, (error) => {
       if(error) {
-        return console.log(error);
+        messages.insertAdjacentHTML('beforeend', `<p>${error}</p>`);
+        return;
       }
     });
     input.value = '';
@@ -69,6 +72,13 @@ socket.on('locationMessage', function(url) {
   messages.insertAdjacentHTML('beforeend', html);
 });
 
-socket.on('message', (msg) => {
-  console.log(msg);
+socket.on('disconnectMessage', (msg) => {
+  messages.insertAdjacentHTML('beforeend', `<p>${msg.text} at ${moment(msg.createdAt).format('h:mm A')}</p>`);
+});
+
+socket.emit('join', { username, room }, (error) => {
+  if(error) {
+    alert(error);
+    location.href = '/'
+  }
 });
