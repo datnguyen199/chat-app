@@ -54,6 +54,7 @@ sendLocaltionButton.addEventListener('click', function() {
 
 socket.on('messageChat', function(msg) {
   const html = Mustache.render(messageTemplate, {
+    username: msg.username,
     msg: `${msg.text}`,
     createdAt: moment(msg.createdAt).format('h:mm A')
   });
@@ -66,6 +67,7 @@ socket.on('messageChat', function(msg) {
 
 socket.on('locationMessage', function(url) {
   const html = Mustache.render(locationTemplate, {
+    username: url.username,
     url: url.text,
     createdAt: moment(url.createdAt).format('h:mm A')
   });
