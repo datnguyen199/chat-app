@@ -4,6 +4,7 @@ const http = require('http');
 const socketio = require('socket.io');
 const Filter = require('bad-words');
 const { generateMessage } = require('./utils/messages');
+const { addUser, removeUser, getUser, getUsersInRoom } = require('./utils/users');
 
 const app = express();
 const server = http.createServer(app);
@@ -15,15 +16,28 @@ const publicDirectoryPath = path.join(__dirname, '../public');
 app.use(express.static(publicDirectoryPath));
 
 io.on('connection', (socket) => {
-  socket.emit('messageChat', generateMessage('Welcome!'));
-  socket.broadcast.emit('message', 'a user just joined!');
+  socket.on('join', ({ username, room }, callback) => {
+    const { error, user } = addUser({ id: socket.id, username, room });
+
+    if(error) {
+      return callback(error);
+    }
+
+    socket.join(user.room);
+
+    socket.emit('messageChat', generateMessage('Welcome!'));
+    socket.broadcast.to(user.room).emit('messageChat', generateMessage(`${user.username} joined!`));
+
+    callback();
+  })
+
   socket.on('chatMessage', (msg, callback) => {
     const filter = new Filter();
     if(filter.isProfane(msg)) {
       return callback('Profanity is not allowed!');
     }
 
-    io.emit('messageChat', generateMessage(msg));
+    io.to('rrr').emit('messageChat', generateMessage(msg));
     callback();
   });
 
@@ -34,7 +48,11 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-    io.emit('message', generateMessage('a user has left!'));
+    const user = removeUser(socket.id);
+
+    if(user) {
+      io.to(user.room).emit('disconnectMessage', generateMessage(`${user.username} has left!`));
+    }
   });
 })
 
