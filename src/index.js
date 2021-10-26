@@ -37,12 +37,22 @@ io.on('connection', (socket) => {
       return callback('Profanity is not allowed!');
     }
 
-    io.to('rrr').emit('messageChat', generateMessage(msg));
+    const user = getUser(socket.id);
+    if(!user) {
+      return callback('Cannot get user!');
+    }
+
+    io.to(user.room).emit('messageChat', generateMessage(msg, user.username));
     callback();
   });
 
   socket.on('sendLocation', (coords, callback) => {
-    io.emit('locationMessage', generateMessage(`https://www.google.com/maps?q=${coords.latitude},${coords.longitude}`));
+    const user = getUser(socket.id);
+    if(!user) {
+      return callback('Cannot get user!');
+    }
+
+    io.to(user.room).emit('locationMessage', generateMessage(`https://www.google.com/maps?q=${coords.latitude},${coords.longitude}`, user.username));
 
     callback();
   });
