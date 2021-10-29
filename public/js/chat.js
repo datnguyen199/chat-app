@@ -8,8 +8,45 @@ var sendLocaltionButton = document.getElementById('send-location');
 var messages = document.getElementById('display-messages');
 var messageTemplate = document.getElementById('message-template').innerHTML;
 var locationTemplate = document.getElementById('location-template').innerHTML;
+var sidebartTemplate = document.getElementById('sidebar-template').innerHTML;
+var typingTemplate = document.getElementById('user-typing-template').innerHTML;
 
-let { username, room } = Qs.parse(location.search, { ignoreQueryPrefix: true })
+let { username, room } = Qs.parse(location.search, { ignoreQueryPrefix: true });
+var isTyping = true;
+var countKeyUp = 0;
+
+const autoscroll = () => {
+  const $newMessage = messages.lastElementChild;
+  const newMessageStyles = getComputedStyle($newMessage);
+  const newMessageMargin = parseInt(newMessageStyles.marginBottom);
+  const newMessageHeight = $newMessage.offsetHeight + newMessageMargin;
+  const visibleHeight = messages.offsetHeight;
+  const containerHeight = messages.scrollHeight;
+  const scrollOffset = messages.scrollTop + visibleHeight;
+  if(containerHeight - newMessageHeight <= scrollOffset) {
+    messages.scrollTop = messages.scrollHeight;
+  }
+}
+
+input.addEventListener('keyup', function(e) {
+  if(input.value && (e.keyCode !== 13 || e.key !== 'Enter')) {
+    countKeyUp++;
+    if(countKeyUp == 1) {
+      isTyping = true;
+    } else {
+      isTyping = false;
+    }
+    socket.emit('typing', { username, room, isTyping });
+  }
+});
+
+input.addEventListener('keyup', function(e) {
+  if((e.which == 8 || e.which == 46) && input.value == "") {
+    countKeyUp = 0;
+    isTyping = false;
+    socket.emit('delete-typing', { username, room });
+  }
+})
 
 form.addEventListener('submit', function(e){
   e.preventDefault();
@@ -30,12 +67,7 @@ function successLocation(pos) {
 
   socket.emit('sendLocation', { latitude: crd.latitude, longitude: crd.longitude }, () => {
     sendLocaltionButton.removeAttribute('disabled');
-    console.log('location shared!')
   });
-  // console.log('Your current position is:');
-  // console.log(`Latitude : ${crd.latitude}`);
-  // console.log(`Longitude: ${crd.longitude}`);
-  // console.log(`More or less ${crd.accuracy} meters.`);
 }
 
 function errorLocation(err) {
@@ -58,11 +90,25 @@ socket.on('messageChat', function(msg) {
     msg: `${msg.text}`,
     createdAt: moment(msg.createdAt).format('h:mm A')
   });
-  messages.insertAdjacentHTML('beforeend', html);
-  // var item = document.createElement('li');
-  // item.textContent = msg;
-  // messages.appendChild(item);
-  // window.scrollTo(0, document.body.scrollHeight);
+  let firstTypingElement = document.querySelector(('[id^="typing-"]'));
+
+  countKeyUp = 0;
+  isTyping = true;
+  if(firstTypingElement) {
+    firstTypingElement.insertAdjacentHTML('beforebegin', html);
+  } else {
+    messages.insertAdjacentHTML('beforeend', html);
+  }
+
+  let element = document.getElementById(`typing-${msg.username}`);
+  if(element) element.remove();
+  autoscroll();
+});
+
+socket.on('delete-typing', function(username) {
+  let element = document.getElementById(`typing-${username}`);
+  if(element) element.remove();
+  autoscroll();
 });
 
 socket.on('locationMessage', function(url) {
@@ -72,10 +118,31 @@ socket.on('locationMessage', function(url) {
     createdAt: moment(url.createdAt).format('h:mm A')
   });
   messages.insertAdjacentHTML('beforeend', html);
+  autoscroll();
 });
+
+socket.on('typing', function(username, isTyping) {
+  const html = Mustache.render(typingTemplate, {
+    username: username
+  });
+  if(isTyping) {
+    messages.insertAdjacentHTML('beforeend', html);
+    autoscroll();
+  }
+})
+
+socket.on('roomData', ({ room, users }) => {
+  const html = Mustache.render(sidebartTemplate, {
+    room,
+    users
+  });
+
+  document.querySelector('#sidebar').innerHTML = html;
+})
 
 socket.on('disconnectMessage', (msg) => {
   messages.insertAdjacentHTML('beforeend', `<p>${msg.text} at ${moment(msg.createdAt).format('h:mm A')}</p>`);
+  autoscroll();
 });
 
 socket.emit('join', { username, room }, (error) => {

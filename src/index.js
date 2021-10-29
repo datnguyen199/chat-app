@@ -15,6 +15,7 @@ const publicDirectoryPath = path.join(__dirname, '../public');
 
 app.use(express.static(publicDirectoryPath));
 
+// const chatNamespace = io.of("/chats");
 io.on('connection', (socket) => {
   socket.on('join', ({ username, room }, callback) => {
     const { error, user } = addUser({ id: socket.id, username, room });
@@ -27,6 +28,10 @@ io.on('connection', (socket) => {
 
     socket.emit('messageChat', generateMessage('Welcome!'));
     socket.broadcast.to(user.room).emit('messageChat', generateMessage(`${user.username} joined!`));
+    io.to(user.room).emit('roomData', {
+      room: user.room,
+      users: getUsersInRoom(user.room)
+    });
 
     callback();
   })
@@ -57,11 +62,23 @@ io.on('connection', (socket) => {
     callback();
   });
 
+  socket.on('typing', ({ username, room, isTyping }, callback) => {
+    socket.broadcast.to(room).emit('typing', username.trim().toLowerCase(), isTyping);
+  });
+
+  socket.on('delete-typing', ({ username, room }, callback) => {
+    socket.broadcast.to(room).emit('delete-typing', username.trim().toLowerCase());
+  });
+
   socket.on('disconnect', () => {
     const user = removeUser(socket.id);
 
     if(user) {
       io.to(user.room).emit('disconnectMessage', generateMessage(`${user.username} has left!`));
+      io.to(user.room).emit('roomData', {
+        room: user.room,
+        users: getUsersInRoom(user.room)
+      });
     }
   });
 })
