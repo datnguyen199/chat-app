@@ -7,6 +7,6 @@ List functions:
 - List users join in a room
 
 # Set up
-step1: npm install
-step2: npm run devstart
-Go to: localhost:3000
+- step1: npm install
+- step2: npm run devstart
+- Go to: localhost:3000
